@@ -7,7 +7,12 @@ import datetime as dt
 
 def driver():
     # Filter catalog
-    newCatalog, search = configFilt()
+    newCatalog, search = configFilt(catalogFile, 
+                                    minDate, maxDate,
+                                    minLat, maxLat, 
+                                    minLon, maxLon, 
+                                    minDepth, maxDepth, 
+                                    minMag, maxMag)
 
     # Get seismicity rate timeseries and plot
     dates, counts = seismicityCount(newCatalog, search)
@@ -15,61 +20,33 @@ def driver():
     plt.show()
 
 # ------------------------------- CONFIGURE -------------------------------
-def configFilt():
+def configFilt(catalogFile, 
+               minDate, maxDate,
+               minLat, maxLat, 
+               minLon, maxLon, 
+               minDepth, maxDepth, 
+               minMag, maxMag):
 
     # Create namedTuple for search parameters
     param = collections.namedtuple('searchParameters',
-                      ['minDate', 'maxDate',          # Must be 'YYYY/MM/DD HH:MM:SS' formatted strings
-                       'minLat', 'maxLat', 
-                       'minLon', 'maxLon', 
-                       'minDepth',  'maxDepth', 
-                       'minMag', 'maxMag'])
+                                  ['minDate', 'maxDate',          # Must be 'YYYY/MM/DD HH:MM:SS' formatted strings
+                                   'minLat', 'maxLat', 
+                                   'minLon', 'maxLon', 
+                                   'minDepth',  'maxDepth', 
+                                   'minMag', 'maxMag'])
 
     # Read in EQ catalog data
-    catalogFile = '~/Thesis/seismicity/ncedc_20140101_20190909.csv'
     catalog  = catalog2df(catalogFile)
 
     # Set search parameters:
-    minDate = '2014/11/01 00:00:00'
-    maxDate = '2019/08/01 00:00:00'
-    minLat = 37
-    maxLat = 39
-    minLon = -120
-    maxLon = -118
-    minDepth = -1
-    maxDepth = 20
-    minMag = 1
-    maxMag = 9
     search = param(minDate=minDate, maxDate=maxDate,
                    minLat=minLat, maxLat=maxLat, 
                    minLon=minLon, maxLon=maxLon, 
                    minDepth=minDepth, maxDepth=maxDepth, 
                    minMag=minMag, maxMag=maxMag)
 
-    # search1 = param(minDate=minDate, maxDate=maxDate,
-    #                minLat=minLat, maxLat=maxLat, 
-    #                minLon=minLon, maxLon=maxLon, 
-    #                minDepth=minDepth, maxDepth=maxDepth, 
-    #                minMag=0, maxMag=1)
-    # search2 = param(minDate=minDate, maxDate=maxDate,
-    #                minLat=minLat, maxLat=maxLat, 
-    #                minLon=minLon, maxLon=maxLon, 
-    #                minDepth=minDepth, maxDepth=maxDepth, 
-    #                minMag=1, maxMag=2)
-    # search3 = param(minDate=minDate, maxDate=maxDate,
-    #                minLat=minLat, maxLat=maxLat, 
-    #                minLon=minLon, maxLon=maxLon, 
-    #                minDepth=minDepth, maxDepth=maxDepth, 
-    #                minMag=2, maxMag=3)
-    # search4 = param(minDate=minDate, maxDate=maxDate,
-    #                minLat=minLat, maxLat=maxLat, 
-    #                minLon=minLon, maxLon=maxLon, 
-    #                minDepth=minDepth, maxDepth=maxDepth, 
-    #                minMag=3, maxMag=9)
-
     # Filter EQ catalog
     newCatalog = filterCatalog(catalog, search)
-
 
     return newCatalog, search
 
@@ -77,17 +54,41 @@ def configFilt():
 # ------------------------------- ANALYSIS -------------------------------
 
 def filterCatalog(catalog, search):
+    print()
+    print('Number of earthquakes in original catalog: ' + str(len(catalog.index)))
 
-    newCatalog = catalog[(catalog['DateTime'] >= search.minDate) &
-                         (catalog['DateTime'] <= search.maxDate) &
-                         (catalog['Latitude'] >= search.minLat) &
-                         (catalog['Latitude'] <= search.maxLat) &
+    minDatetime = dt.datetime.strptime(search.minDate, '%Y/%m/%d %X')
+    maxDatetime = dt.datetime.strptime(search.maxDate, '%Y/%m/%d %X')
+
+    newCatalog = catalog[(catalog['DateTime']  >= minDatetime) &
+                         (catalog['DateTime']  <= maxDatetime) &
+                         (catalog['Latitude']  >= search.minLat) &
+                         (catalog['Latitude']  <= search.maxLat)  &
                          (catalog['Longitude'] >= search.minLon) &
                          (catalog['Longitude'] <= search.maxLon) &
-                         (catalog['Depth'] >= search.minDepth) & 
-                         (catalog['Depth'] < search.maxDepth) &
+                         (catalog['Depth']     >= search.minDepth) & 
+                         (catalog['Depth']     <  search.maxDepth) &
                          (catalog['Magnitude'] >= search.minMag) &
-                         (catalog['Magnitude'] < search.maxMag) ]
+                         (catalog['Magnitude'] <  search.maxMag) ]
+
+    print()
+    print('Search parameters: ')
+    print('minDate: '  + minDatetime.strftime('%Y/%m/%d'))
+    print('maxDate: '  + maxDatetime.strftime('%Y/%m/%d'))
+    print('minLon: '   + str(search.minLon))
+    print('maxLon: '   + str(search.maxLon))
+    print('minLat: '   + str(search.minLat))
+    print('maxLat: '   + str(search.maxLat))
+    print('minDepth: ' + str(search.minDepth))
+    print('maxDepth: ' + str(search.maxDepth))
+    print('minMag: '   + str(search.minMag))
+    print('maxMag: '   + str(search.maxMag))
+    print()
+    print('Number of earthquakes in new catalog: ' + str(len(newCatalog.index)))
+    print()
+    print(newCatalog.head(5))
+    print(newCatalog.tail())
+
 
     return newCatalog
 
@@ -97,6 +98,7 @@ def seismicityCount(catalog, search):
     # Convert date range to datetime format
     minDatetime = dt.datetime.strptime(search.minDate, '%Y/%m/%d %X')
     maxDatetime = dt.datetime.strptime(search.maxDate, '%Y/%m/%d %X')
+
     # Get number of days in range
     days = maxDatetime - minDatetime
     print(days.days)
